@@ -45,7 +45,7 @@ def regNonconvex(x, lamda, a=1, arg=None):
     returns  f, g, Hv of lamda*a*x^2/(1+a*x^2)
     """
     ax2 = a*x**2
-    f = lamda*sum(ax2/(1+ax2))  
+    f = lamda*torch.sum(ax2/(1+ax2))  
     if arg == 'f':
         return f.detach()
     

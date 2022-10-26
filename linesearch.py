@@ -1,6 +1,7 @@
 import torch
 from torch.nn.utils import parameters_to_vector, vector_to_parameters
 
+
 def linesearch(obj, fk, gTp, x, p, maxiter=200, alpha=1, c1=1e-4):
     """    
     INPUTS:
@@ -18,14 +19,10 @@ def linesearch(obj, fk, gTp, x, p, maxiter=200, alpha=1, c1=1e-4):
         T: iterations
     """
     T = 0
-    # fa = _fa(obj, x, alpha, p) 
     fa = obj(x + alpha * p, 'f')       
-    # fk = obj(x, 'f')
     while fa > fk+alpha*c1*gTp and T < maxiter:
         alpha *= 0.5
-        # fa = _fa(obj, x, alpha, p)  
         fa = obj(x + alpha * p, 'f')   
-#        print(fa)
         T += 1    
         if alpha < 1E-18: 
             alpha = 0 # Kill small alpha
@@ -49,14 +46,11 @@ def linesearchgrad(obj, gk2, Hg, x, p, maxiter=200, alpha=1, c1=1e-4):
         T: iterations
     """
     T = 0    
-    # ga2 = _ga2(obj, x, alpha, p)
     _, ga = obj(x + alpha * p, 'fg')   
-    # gk = obj(x, 'g')
     while (ga.norm())**2 > gk2 + 2*alpha*c1*torch.dot(
             p, Hg) and T < maxiter:
         alpha *= 0.5
         _, ga = obj(x + alpha * p, 'fg')   
-        # ga2 = _ga2(obj, x, alpha, p)
         T += 1       
         if alpha < 1E-18: 
             alpha = 0 # Kill small alpha
@@ -65,7 +59,7 @@ def linesearchgrad(obj, gk2, Hg, x, p, maxiter=200, alpha=1, c1=1e-4):
     return x, alpha, T
 
 # @profile
-def linesearch_NewtonMR(obj, fk, gTp, x, p, maxiter=200, c1=1e-4):
+def linesearch_NewtonMR(obj, fk, gTp, x, p, maxiter=200, c1=1e-4, alpha0 =1):
     """    
     INPUTS:
         obj: a function handle of f (+ gradient, Hessian-vector-product)
@@ -82,29 +76,28 @@ def linesearch_NewtonMR(obj, fk, gTp, x, p, maxiter=200, c1=1e-4):
         T: iterations
     """
     T = 0
-#    alpha = 2*(1 - 2*c1)
-    alpha = 1
-#    if alpha == 1:
+    alpha = alpha0
     zeta = 2
-#    else:
-#        zeta = 2*(1 - 2*c1)
-    # fa = _fa(obj, x, alpha, p) 
-    # fa = obj(x + alpha * p, 'f')
-    fa = obj(x + alpha * p, 'f')
-    # fk = obj(x, 'f')
-    # print(gTp, fa, fk)
-    while fa > fk+alpha*c1*gTp and T < maxiter or torch.isnan(fa):
-        alpha = alpha/zeta
-        # fa = _fa(obj, x, alpha, p) 
-        fa = obj(x + alpha * p, 'f')
+    fa = obj(x + alpha * p, 'f')   
+    if fa > fk+alpha*c1*gTp:
+        while fa > fk+alpha*c1*gTp and T < maxiter or torch.isnan(fa):
+            alpha = alpha/zeta
+            fa = obj(x + alpha * p, 'f')
+            T = T + 1    
+            if alpha < 1E-18: 
+                alpha = 0 # Kill small alpha
+                break
+    else:
+        alpha_tmp = alpha*2*(1-2*c1)
+        fb = obj(x + alpha_tmp * p, 'f')
+        if fb < fa and fb <= fk+alpha*c1*gTp:
+            alpha = alpha_tmp
         T = T + 1    
-        if alpha < 1E-18: 
-            alpha = 0 # Kill small alpha
-            break
     x = x + alpha*p    
     return x, alpha, T
 
-def linesearch_NewtonMR_NC(obj, fk, gTp, x, p, maxiter=200, c1=1e-4, alpha_max=1e8):
+def linesearch_NewtonMR_NC(obj, fk, gTp, x, p, maxiter=200, c1=1e-4, alpha0 = 1,
+                           alpha_max=1e10):
     """    
     INPUTS:
         obj: a function handle of f (+ gradient, Hessian-vector-product)
@@ -121,34 +114,24 @@ def linesearch_NewtonMR_NC(obj, fk, gTp, x, p, maxiter=200, c1=1e-4, alpha_max=1
         T: iterations
     """
     T = 0
-#    alpha = 2*(1 - 2*c1)
-    alpha = 1
+    alpha = alpha0
     zeta = 2
-    # fa = _fa(obj, x, alpha, p)
     fa = obj(x + alpha * p, 'f')   
-    # fk = obj(x, 'f')
-    # print(fa)
     if torch.isnan(fa):
         print('FisNan')
     if fa <= fk+alpha*c1*gTp:
-#        print('NC Linesearch passes')
-#        fal = fk
-        # while fa <= fk+alpha*c1*gTp and T < maxiter and alpha < alpha_max:
         while fa <= fk+alpha*c1*gTp and T < maxiter and alpha <= alpha_max:
-#            print('fa', fa, alpha)
-            alpha = alpha*zeta
-#            fal = fa
-            # fa = _fa(obj, x, alpha, p) 
+            alphal = alpha
+            if alpha == alpha_max:
+                break
+            alpha = min(alpha*zeta, alpha_max)
             fa = obj(x + alpha * p, 'f')   
             T = T + 1    
-        x = x + alpha/zeta*p    
-        return x, alpha, T
+        x = x + alphal*p    
+        return x, alphal, T
     else:
         while fa > fk+alpha*c1*gTp and T < maxiter or torch.isnan(fa):
-#            print('fa', fa, alpha)
             alpha = alpha/zeta
-            # print(alpha, zeta)
-            # fa = _fa(obj, x, alpha, p)
             fa = obj(x + alpha * p, 'f')   
             T = T + 1    
             if alpha < 1E-18: 
@@ -157,42 +140,55 @@ def linesearch_NewtonMR_NC(obj, fk, gTp, x, p, maxiter=200, c1=1e-4, alpha_max=1
         x = x + alpha*p    
         return x, alpha, T
 
+def linesearch_NewtonCG_Pert_NC(obj, fk, x, p, maxiter=200, alpha0=1, c1=1e-4, 
+                                alpha_max=1e10):
+    T = 0
+    alpha = alpha0
+    fa = obj(x + alpha * p, 'f')   
+    # fk = obj(x, 'f')
+    p_norm3 = p.norm()**3
+    if fa > fk - alpha**3*c1*p_norm3/6:
+        while fa > fk - alpha**3*c1*p_norm3/6 and T < maxiter:
+            alpha = alpha/2
+            fa = obj(x + alpha * p, 'f')   
+            T = T + 1    
+            if alpha < 1E-18: 
+                alpha = 0 # Kill small alpha
+                break
+        x = x + alpha*p    
+        return x, alpha, T
+    else:
+        # print('pass')
+        while fa <= fk - alpha**3*c1*p_norm3/6 and T < maxiter and alpha <= alpha_max:
+            alphal = alpha
+            if alpha == alpha_max:
+                break
+            alpha = min(alpha*2, alpha_max)
+            # fa = _fa(obj, x, alpha, p)
+            fa = obj(x + alpha * p, 'f')   
+            T = T + 1    
+        x = x + alphal*p 
+        return x, alphal, T
+    
 def linesearchNC(obj, fk, x, p, maxiter=200, alpha=1, c1=1e-4):
-    """    
-    INPUTS:
-        obj: a function handle of f (+ gradient, Hessian-vector-product)
-        x: starting x
-        p: direction p
-        maxiter: maximum iteration of Armijo line-search
-        alpha: initial step-size
-        c1: parameter of Armijo line-search
-    OUTPUTS:
-        x: results
-        alpha: proper step-size
-        T: iterations
-    """
 
     T = 0
     theta = 0.5
-    # fa = _fa(obj, x, alpha, p)
     fa = obj(x + alpha * p, 'f')   
-    # fk = obj(x,'f')
-    # print(' p',p)
     while fa > fk - alpha**3*c1*p.norm()**3/6 and T < maxiter or torch.isnan(fa):
         alpha = alpha*theta
-        # fa = _fa(obj, x, alpha, p)
         fa = obj(x + alpha * p, 'f')   
         T += 1    
         if alpha < 1E-18: 
             alpha = 0 # Kill small alpha
             break
     x = x + alpha*p
-#    print(fa - fk)
     return x, alpha, T
 
 
+
 # @profile
-def linesearchzoom(obj, f0, g0p, x, p, maxiter=200, c1=1e-4, c2=0.4, amax=100, fe=1000):
+def linesearchzoom(obj, f0, g0p, x, p, maxiter=200, c1=1e-4, c2=0.4, amax=1E10, fe=1000, alpha0=1):
     """    
     All vector are column vectors.
     INPUTS:
@@ -208,21 +204,17 @@ def linesearchzoom(obj, f0, g0p, x, p, maxiter=200, c1=1e-4, c2=0.4, amax=100, f
         alpha: proper step-size
         T: iterations
     """
-    #phi(x) = f(x), phi'(x) = g(x).T.dot(p)
     p = p.detach()
     itrs = 0
     itrfe = 0
     itrs2 = 0
     a1 = 0
-    a2 = 1
-    # f0, g0 = obj(x, 'fg')
+    a2 = alpha0
     fb = f0 # f preview
     alpha = 0
     while itrs < maxiter:
         fa, ga = obj(x + a2*p, 'fg')
-        # fa, ga = _fga(obj, x, a2, p)
         itrs += 1 ## call fa
-#        print(f0, fa)
         if fa > f0 + a2*c1*g0p or (fa >= fb and itrs > 0):
             alpha, itrs2, itrfe = zoomf(a1, a2, obj, f0, fa, g0p, x, p, c1, c2, 
                                  itrs, itrfe, maxiter, fe)
@@ -234,18 +226,12 @@ def linesearchzoom(obj, f0, g0p, x, p, maxiter=200, c1=1e-4, c2=0.4, amax=100, f
             itrs2 = 0
             break
         if gap >= 0:            
-#            print('Zoom backward')
             alpha, itrs2, itrfe = zoomf(a2, a1, obj, f0, fa, g0p, x, p, c1, c2, 
                                  itrs, itrfe, maxiter, fe)
             # alpha, itrs2 = zoomf(a1, a2, obj, f0, fa, g0p, x, p, c1, c2, itrs, maxiter)
             break
-        # if amax == 1:
-        a2 = a2*2
-        # else:
-        #     a2 = min(a2*2, amax)
+        a2 = min(a2*2, (a2*2+amax)/2)
         fb = fa
-        # print(a2)
-        # itrs += 1
     itrs += itrs2
 #     if itrs >= maxiter:        
 #         alpha = 0
@@ -268,7 +254,6 @@ def zoomf(a1, a2, obj, f0, fa, g0p, x, p, c1, c2, itrs, itrfe, maxiter, fe):
         ga1p = torch.dot(ga1, p)
         # upper bound
         fa2, ga2 = obj(x + a2*p, 'fg')
-        # fa2, ga2 = _fga(obj, x, a2, p)
         itrfe += 2 # call fa2, ga2
         while torch.isnan(fa2):
             # sometime even alpha_max=1 is too large
@@ -278,15 +263,12 @@ def zoomf(a1, a2, obj, f0, fa, g0p, x, p, c1, c2, itrs, itrfe, maxiter, fe):
         a_mid = (a1 + a2)/2
         if not inside(aj, a1, a_mid):
             aj = a_mid
-        # faj, gaj = _fga(obj, x, aj, p)
         faj, gaj = obj(x + aj*p, 'fg')
         itrfe += 2 # call faj, gaj
-        # print('f', faj, f0, a1, a2, aj)
         if faj > f0 + aj*c1*g0p or faj >= fa1:
             a2 = aj
         else:
             gajp = torch.dot(gaj, p)
-#            print('g', gajp, -c2*g0p)
             if abs(gajp) <= -c2*g0p:
                 break
             if gajp*(a2 - a1) >= 0:

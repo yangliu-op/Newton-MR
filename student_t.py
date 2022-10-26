@@ -50,7 +50,8 @@ from regularizer import regConvex
 #                     A[idx_H,:], v)) + reg_Hv(v)).detach()
 #             return f.detach(), g.detach(), Hv  
 
-def student_t(A, b, x, nu=1, HProp=1, arg=None, reg=None):
+def student_t(A, b, x, nu=1, HProp=1, arg=None, reg=None,
+                 index=None):
     """
     returns  f, g, Hv of sum(log(1+||Ax-b||^2/nu))/n
     """
@@ -61,6 +62,8 @@ def student_t(A, b, x, nu=1, HProp=1, arg=None, reg=None):
     else:
         reg_f, reg_g, reg_Hv = reg(x)
         
+    if index is not None:
+        A = A[:,index]
     r = torch.mv(A, x) - b
     n = A.shape[0]
     a = r/nu

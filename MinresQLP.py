@@ -108,7 +108,7 @@ from numpy.linalg import norm
 from myCG import myCG
 
 def MinresQLP(A, b, rtol=None, maxit=None, M=None, shift=None,maxxnorm=None,
-              Acondlim=None, TranCond=None):
+              Acondlim=None, TranCond=None, P=None):
     if rtol is None:
         rtol = 1e-4
     if maxit is None:
@@ -354,6 +354,7 @@ def MinresQLP(A, b, rtol=None, maxit=None, M=None, shift=None,maxxnorm=None,
             xl2 = xl2 + wl2*ul2
             oldx = x #new
             x = xl2 + wl*ul + w*u 
+            # print(P @ x - x)
             # new
             oldrk = rk
             rk = sn**2 * oldrk - phi * cs * vnew
@@ -839,14 +840,19 @@ def main():
     # torch.manual_seed(1)
     # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     device = torch.device("cpu")
-    n = 5
-    A = torch.randn(n, n, device=device)
-    b = torch.randn(n, device=device)
+    n = 3
+    A = torch.randn(n, n, device=device, dtype=torch.float64)
+    b = torch.randn(n, device=device, dtype=torch.float64)
+    U, s, V = torch.svd(A + A.T)
+    d = 2
+    s[d:] = 0
+    P = U[:,:d] @ U[:,:d].T
+    A = U @ torch.diag(s) @ V.T
     # print(b)
     # x = torch.dot(b,b)
     # x = torch.mm(b.T, b)
-    x, relres, iters= MinresQLP(A + A.T, b, 1E-2, 100)
-    print(x)
+    x, relres, iters= MinresQLP(A, b, 1E-2, n, P=P)
+    print(P@x - x)
     
 if __name__ == '__main__':
     main()

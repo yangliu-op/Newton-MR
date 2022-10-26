@@ -1,9 +1,11 @@
 import numpy as np
-import os
 import matplotlib.pyplot as plt
+import torch
+import os
+os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
 def pProfile(methods, Matrix, length=300, arg='log10', cut=None, 
-             ylabel='Performance Profile', ylim=None, Input_positive=True):
+             xlabel=r'$\tau$', ylim=None, Input_positive=True, leg=False):
     """
     A performance profile plot is the CDF of the performance of every 
     algorithms. Put your pProfile record (objVal/gradNorm/err) matrix to 
@@ -32,8 +34,7 @@ les for benchmarking
         performance profile plots of the cooresponding (f/g/error) record 
         matrix.
     """
-    
-    M_hat = np.min(Matrix, axis=1) + 1E-50
+    M_hat = np.min(Matrix, axis=1)
     if not Input_positive:
         ### If M_hat contains negative number, 
         ### shift all result with - 2*M_hat, Then the minimum = -M_hat 
@@ -43,18 +44,24 @@ les for benchmarking
     R = Matrix.T/M_hat
     R = R.T   
     x_high = np.max(R)
+    ftsize = 12
+    # x_high = 1E45
+    # index = np.max(R,1) <= x_high
+    # n2 = sum(index)
+    # R = R[index]
     if arg is None:
         x = np.linspace(1, x_high, length)
         myplt = plt.plot
-        plt.xlabel('lambda')
+        plt.xlabel(xlabel)
     if arg == 'log2':
         x = np.logspace(0, np.log2(x_high), length)
         myplt = plt.semilogx
-        plt.xlabel('log2(lambda)')
+        plt.xlabel(r'log2$(\tau)$')
     if arg == 'log10':
         x = np.logspace(0, np.log10(x_high), length)
         myplt = plt.semilogx
-        plt.xlabel('log(lambda)')
+        plt.xlabel(xlabel)
+        # plt.xlabel(r'log$(\tau)$')
     n, d = Matrix.shape
     if cut != None:
         x = x[:cut]
@@ -62,8 +69,10 @@ les for benchmarking
     
     # colors = ['k', 'm', 'g', 'y', 'r', 'b', 'c']
     # linestyles = ['--', '-.', '-']
-    colors = ['k', 'm', 'b', 'g', 'y', 'r', 'k', 'm', 'b', 'g']
-    linestyles = ['-', '-', '-', '--', '--', '--', '-.', '-.', '-.', '-.']
+    # colors = [ 'g', 'b', 'y', 'r', 'm', 'k', 'm', 'b', 'g']
+    # linestyles = ['--', '-', '--', '-', '--', '-', '-.', '-.', '-.', '-.']
+    colors =      [ 'g', 'b', 'y', 'r', 'm', 'c',  'k', 'b', 'g']
+    linestyles = ['--', '--', '-.', '-.', '-', '-.', '-', '-', '-.', '-.']
     
     if ylim != None:
         axes = plt.axes()
@@ -71,76 +80,139 @@ les for benchmarking
     
     for i in range(len(methods)):
         myMethod = methods[i]
+        print(myMethod)
 #        loop_i = int((i+1)/7)
         Ri = np.tile(R[:,i], (length, 1))
         xi = np.tile(x, (n,1))
         yi = np.sum((Ri.T <= xi), axis=0)/n
-        # myplt(x, yi, color=colors[i-7*loop_i], linestyle=linestyles[loop_i], 
-        #       label = myMethod)
         myplt(x, yi, color=colors[i], linestyle=linestyles[i], 
               label = myMethod)
+        # plt.plot(np.log(x), yi, color=colors[i], linestyle=linestyles[i], 
+        #       label = myMethod)
         
-    plt.ylabel(ylabel)
-    plt.legend()
+    # plt.xlabel('$\lambda$')
+    plt.ylabel(r'Pr$(ratio \leq \tau)$')
+    if leg:
+        # plt.legend()
+        plt.legend(fontsize=ftsize)
     
     
 def main():        
     with open('pProfile/methods.txt', 'r') as myfile:
         methods = myfile.read().split()
-    F = np.loadtxt(open("pProfile/ALL_1E5/objVal.txt","rb"),delimiter=",",skiprows=0)
-    # F2 = np.loadtxt(open("pProfile/TR_1E5_10_100/objVal.txt","rb"),delimiter=",",skiprows=0)
-    # F = np.append(F, F2, axis=0)
-    # F3 = np.loadtxt(open("pProfile/TR_1E5_100/objVal.txt","rb"),delimiter=",",skiprows=0)
-    # F = np.append(F, F3, axis=0)
-    # F4 = np.loadtxt(open("pProfile/RandLS_10/LS4/objVal.txt","rb"),delimiter=",",skiprows=0)
-    # F = np.append(F, F4, axis=0)
-    # F5 = np.loadtxt(open("pProfile/LS_10/LS5/objVal.txt","rb"),delimiter=",",skiprows=0)
+    F = np.loadtxt(open("pProfile/rand/1/objVal.txt","rb"),delimiter=",",skiprows=0)
+    F2 = np.loadtxt(open("pProfile/rand/2/objVal.txt","rb"),delimiter=",",skiprows=0)
+    F = np.append(F, F2, axis=0)
+    F3 = np.loadtxt(open("pProfile/rand/3/objVal.txt","rb"),delimiter=",",skiprows=0)
+    F = np.append(F, F3, axis=0)
+    F4 = np.loadtxt(open("pProfile/rand/4/objVal.txt","rb"),delimiter=",",skiprows=0)
+    F = np.append(F, F4, axis=0)
+    # F5 = np.loadtxt(open("pProfile/randn/5/objVal.txt","rb"),delimiter=",",skiprows=0)
     # F = np.append(F, F5, axis=0)
-    # F6 = np.loadtxt(open("pProfile/LS_10/LS6/objVal.txt","rb"),delimiter=",",skiprows=0)
-    # F = np.append(F, F6, axis=0)
-    # F7 = np.loadtxt(open("pProfile/LS_10/LS7/objVal.txt","rb"),delimiter=",",skiprows=0)
-    # F = np.append(F, F7, axis=0)
-    # F8 = np.loadtxt(open("pProfile/LS_100/LS8/objVal.txt","rb"),delimiter=",",skiprows=0)
-    # F = np.append(F, F8, axis=0)
-    # F9 = np.loadtxt(open("pProfile/LS_100/LS9/objVal.txt","rb"),delimiter=",",skiprows=0)
-    # F = np.append(F, F9, axis=0)
+    # F = np.loadtxt(open("pProfile/randn/1/objVal2.txt","rb"),delimiter=",",skiprows=0)
+    # F2 = np.loadtxt(open("pProfile/randn/2/objVal2.txt","rb"),delimiter=",",skiprows=0)
+    # F = np.append(F, F2, axis=0)
+    # F3 = np.loadtxt(open("pProfile/randn/3/objVal2.txt","rb"),delimiter=",",skiprows=0)
+    # F = np.append(F, F3, axis=0)
+    # F4 = np.loadtxt(open("pProfile/randn/4/objVal2.txt","rb"),delimiter=",",skiprows=0)
+    # F = np.append(F, F4, axis=0)
+    # F5 = np.loadtxt(open("pProfile/randn/5/objVal2.txt","rb"),delimiter=",",skiprows=0)
+    # F = np.append(F, F5, axis=0)
+    # F = np.loadtxt(open("pProfile/randn/1/objVal3.txt","rb"),delimiter=",",skiprows=0)
+    # F2 = np.loadtxt(open("pProfile/randn/2/objVal3.txt","rb"),delimiter=",",skiprows=0)
+    # F = np.append(F, F2, axis=0)
+    # F3 = np.loadtxt(open("pProfile/randn/3/objVal3.txt","rb"),delimiter=",",skiprows=0)
+    # F = np.append(F, F3, axis=0)
+    # F4 = np.loadtxt(open("pProfile/randn/4/objVal3.txt","rb"),delimiter=",",skiprows=0)
+    # F = np.append(F, F4, axis=0)
+    # F5 = np.loadtxt(open("pProfile/randn/5/objVal3.txt","rb"),delimiter=",",skiprows=0)
+    # F = np.append(F, F5, axis=0)
+    # F = np.loadtxt(open("pProfile/randn/1/objVal4.txt","rb"),delimiter=",",skiprows=0)
+    # F2 = np.loadtxt(open("pProfile/randn/2/objVal4.txt","rb"),delimiter=",",skiprows=0)
+    # F = np.append(F, F2, axis=0)
+    # F3 = np.loadtxt(open("pProfile/randn/3/objVal4.txt","rb"),delimiter=",",skiprows=0)
+    # F = np.append(F, F3, axis=0)
+    # F4 = np.loadtxt(open("pProfile/randn/4/objVal4.txt","rb"),delimiter=",",skiprows=0)
+    # F = np.append(F, F4, axis=0)
+    # F5 = np.loadtxt(open("pProfile/randn/5/objVal4.txt","rb"),delimiter=",",skiprows=0)
+    # F = np.append(F, F5, axis=0)
+    # isnan = np.argwhere(np.isnan(F))
+    # a, b = isnan.shape
+    # for i in range(a):
+    #     F[isnan[i][0], isnan[i][1]] = 10*max(F[isnan[i][0]])
     
-    G = np.loadtxt(open("pProfile/ALL_1E5/gradNorm.txt","rb"),delimiter=",",skiprows=0)
-    # G2 = np.loadtxt(open("pProfile/TR_1E5_10_100/gradNorm.txt","rb"),delimiter=",",skiprows=0)
-    # G = np.append(G, G2, axis=0)
-    # G3 = np.loadtxt(open("pProfile/TR_1E5_100/gradNorm.txt","rb"),delimiter=",",skiprows=0)
-    # G = np.append(G, G3, axis=0)
-    # G4 = np.loadtxt(open("pProfile/RandLS_10/LS4/gradNorm.txt","rb"),delimiter=",",skiprows=0)
-    # G = np.append(G, G4, axis=0)
-    # G5 = np.loadtxt(open("pProfile/LS_10/LS5/gradNorm.txt","rb"),delimiter=",",skiprows=0)
+    G = np.loadtxt(open("pProfile/rand/1/gradNorm.txt","rb"),delimiter=",",skiprows=0)
+    G2 = np.loadtxt(open("pProfile/rand/2/gradNorm.txt","rb"),delimiter=",",skiprows=0)
+    G = np.append(G, G2, axis=0)
+    G3 = np.loadtxt(open("pProfile/rand/3/gradNorm.txt","rb"),delimiter=",",skiprows=0)
+    G = np.append(G, G3, axis=0)
+    G4 = np.loadtxt(open("pProfile/rand/4/gradNorm.txt","rb"),delimiter=",",skiprows=0)
+    G = np.append(G, G4, axis=0)
+    # G5 = np.loadtxt(open("pProfile/randn/5/gradNorm.txt","rb"),delimiter=",",skiprows=0)
     # G = np.append(G, G5, axis=0)
-    # G6 = np.loadtxt(open("pProfile/LS_10/LS6/gradNorm.txt","rb"),delimiter=",",skiprows=0)
-    # G = np.append(G, G6, axis=0)
-    # G7 = np.loadtxt(open("pProfile/LS_10/LS7/gradNorm.txt","rb"),delimiter=",",skiprows=0)
-    # G = np.append(G, G7, axis=0)
-    # G8 = np.loadtxt(open("pProfile/LS_100/LS8/gradNorm.txt","rb"),delimiter=",",skiprows=0)
-    # G = np.append(G, G8, axis=0)
-    # G9 = np.loadtxt(open("pProfile/LS_100/LS9/gradNorm.txt","rb"),delimiter=",",skiprows=0)
-    # G = np.append(G, G9, axis=0)
+    # G = np.loadtxt(open("pProfile/randn/1/gradNorm3.txt","rb"),delimiter=",",skiprows=0)
+    # G2 = np.loadtxt(open("pProfile/randn/2/gradNorm3.txt","rb"),delimiter=",",skiprows=0)
+    # G = np.append(G, G2, axis=0)
+    # G3 = np.loadtxt(open("pProfile/randn/3/gradNorm3.txt","rb"),delimiter=",",skiprows=0)
+    # G = np.append(G, G3, axis=0)
+    # G4 = np.loadtxt(open("pProfile/randn/4/gradNorm3.txt","rb"),delimiter=",",skiprows=0)
+    # G = np.append(G, G4, axis=0)
+    # G5 = np.loadtxt(open("pProfile/randn/5/gradNorm3.txt","rb"),delimiter=",",skiprows=0)
+    # G = np.append(G, G5, axis=0)
+    # G = np.loadtxt(open("pProfile/randn/1/gradNorm4.txt","rb"),delimiter=",",skiprows=0)
+    # G2 = np.loadtxt(open("pProfile/randn/2/gradNorm4.txt","rb"),delimiter=",",skiprows=0)
+    # G = np.append(G, G2, axis=0)
+    # G3 = np.loadtxt(open("pProfile/randn/3/gradNorm4.txt","rb"),delimiter=",",skiprows=0)
+    # G = np.append(G, G3, axis=0)
+    # G4 = np.loadtxt(open("pProfile/randn/4/gradNorm4.txt","rb"),delimiter=",",skiprows=0)
+    # G = np.append(G, G4, axis=0)
+    # G5 = np.loadtxt(open("pProfile/randn/5/gradNorm4.txt","rb"),delimiter=",",skiprows=0)
+    # G = np.append(G, G5, axis=0)
+    # isnan = np.argwhere(np.isnan(G))
+    # a, b = isnan.shape
+    # for i in range(a):
+    #     G[isnan[i][0], isnan[i][1]] = 10*max(G[isnan[i][0]])
     np.savetxt(os.path.join('pProfile', 'objVal.txt'), F, delimiter=',')
     np.savetxt(os.path.join('pProfile', 'gradNorm.txt'), G, delimiter=',')
-    F[F==0] = 1e-30
-    G[G==0] = 1e-30
-#    Err = np.loadtxt(open("pProfile/err.txt","rb"),delimiter=",",skiprows=0)
-    
+    FF = torch.tensor(F)
+    GG = torch.tensor(G)
+    # index_F = torch.min(FF, 1)[0] == 0
+    # nb = sum(index_F)
+    n, m = F.shape
+    for i in range(n):
+        if torch.min(FF[i,:]) == 0:    
+            if torch.max(FF[i,:]) == 0:
+                FF[i,:] = FF[i,:] + 1
+            else:
+                adj = torch.min(FF[i,:][FF[i,:]!=0])*1E-5
+                FF[i,:] = FF[i,:] + adj.item()
+                
+        if torch.min(GG[i,:]) == 0:
+            if torch.max(GG[i,:]) == 0:
+                GG[i,:] = GG[i,:] + 1
+            else:
+                adj = torch.min(GG[i,:][GG[i,:]!=0])*1E-5
+                GG[i,:] = GG[i,:] + adj.item()
     mypath = 'pProfile'
     if not os.path.isdir(mypath):
        os.makedirs(mypath)
-    figsz = (16,12)
-    mydpi = 200
+    figsz = (8,5)
+    mydpi = 600
     length = 300
+    # myorder = [0,1,2,3,4,5,6]
+    myorder = [1, 2, 5, 6, 4, 3, 0]
+    methodss = methods.copy()
+    for j in range(len(myorder)):
+        methodss[j] = methods[myorder[j]]
+        F[:,j] = FF[:,myorder[j]]
+        G[:,j] = GG[:,myorder[j]]
     
     fig1 = plt.figure(figsize=figsz)    
-    pProfile(methods, F, length, arg='log10',cut=80, ylabel='Performance Profile on f', Input_positive=False) #80 150
+    pProfile(methodss, F, length, arg='log10',cut=80, Input_positive=False, leg=True) #80 150
     fig1.savefig(os.path.join(mypath, 'F'), dpi=mydpi)
     
-    fig2 = plt.figure(figsize=figsz)    
-    pProfile(methods, G, length, arg='log10',cut=80, ylabel='Performance Profile on g')
+    fig2 = plt.figure(figsize=figsz)
+    pProfile(methodss, G, length, arg='log10',cut=80, Input_positive=True)
     fig2.savefig(os.path.join(mypath, 'GradientNorm'), dpi=mydpi)
     
 # =============================================================================
